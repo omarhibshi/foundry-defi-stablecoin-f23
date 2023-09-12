@@ -38,9 +38,9 @@ contract Invariants is StdInvariant, Test {
         // hey, don't call redeemCollateral() unless there is collateral to redeem
     }
 
-    ////////////////////////////////////////////////////////////////////////
-    /// Invariant test calls a ton of different functions on the handler ///
-    /// parameters of these functions will be populated with randomized  ///
+    /////////////////////////////////////////////////////////////////////////
+    /// Invariant test calls a ton of different functions on the handler. ///
+    /// Parameters of these functions will be populated with randomized  ///
     /// values                                                           ///
     ////////////////////////////////////////////////////////////////////////
 
@@ -66,7 +66,7 @@ contract Invariants is StdInvariant, Test {
 
     ////////////////////////////////////////////////////
     // The getter function shouldn't revert.         //
-    // if any of the handler function cominations    //
+    // If any of the handler function cominations    //
     // breaks any of the getters, then it means the  //
     // Invariant broke                               //
     ///////////////////////////////////////////////////
