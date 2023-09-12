@@ -49,6 +49,7 @@ import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import {OracleLib} from "./libraries/OracleLib.sol";
 
 // // // // // // // // // // // // //
 // interfaces, libraries, contracts //
@@ -69,6 +70,12 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__Health_Factor_Not_Improved();
 
     // // // // // // // //
+    //  Types            //
+    // // // // // // // //
+
+    using OracleLib for AggregatorV3Interface;
+
+    // // // // // // // //
     //  State variables  //
     // // // // // // // //
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10; // 1e8;
@@ -77,6 +84,9 @@ contract DSCEngine is ReentrancyGuard {
     uint256 private constant LIQUIDATION_PRECISION = 100; // 0.1
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
     uint256 private constant LIQUIDATION_BONUS = 10; // this means a 10% bonus
+    // Depoiste:
+    // 200% <-> 110%  the system is safe
+    // 50% this violates the collateral to debt ratio, thus breaks our entire system
 
     mapping(address token => address priceFeed) private s_priceFeeds; // tokenToPriceFeed
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited; // userTokenBalances
@@ -316,6 +326,13 @@ contract DSCEngine is ReentrancyGuard {
 
     // The caller "_dscFrom" of this burnDsc() will have to fork out the amount of DSC burned from his bag, in rteun he will get rewarded with the collateral
     // The _onBehalfOf who is liquidated will have the DSC deducted from his bag,
+    // USER gets to keep his DSC but he wont have the loan anymore (neithe some or all of his collateral)
+
+    // To simplify Liquidation:
+    // 1. USER enters with collateral and DSC
+    // 2. Liquidator enters with DSC (just about enough to cover the ammount USER owns), he may also have some collateral (but thats not important here)
+    // 3. USER gets liquidated, his DSC remains intact and his collateral is taken
+    // 4. Liquidator gets the collateral (taken from USER) and his DSC is burned (taken from his bag)
     function _burnDsc(uint256 _amountDscToBurn, address _onBehalfOf, address _dscFrom) private {
         s_DSCMinted[_onBehalfOf] -= _amountDscToBurn;
         // instead of sending the DSCs to a burn address, below DSCEngine takes those DSCs from user ( msg.sender).
@@ -364,7 +381,7 @@ contract DSCEngine is ReentrancyGuard {
         pure
         returns (uint256)
     {
-        if (totalDscMinted == 0) return type(uint256).max;
+        if (totalDscMinted == 0) return type(uint256).max; // This was added to avoid devision by zero when the user has no DSC minted
         uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
         return (collateralAdjustedForThreshold * PRECISION) / totalDscMinted;
     }
@@ -387,7 +404,7 @@ contract DSCEngine is ReentrancyGuard {
         // $/ETH ETH ??
         // exapmle: price $2000/ETH and we have $1000 => we have 0.5 ETH (1000/2000)
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[_tokenCollateral]);
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.staleCheckLatestRoundData();
 
         return (_usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION);
     }
@@ -404,7 +421,7 @@ contract DSCEngine is ReentrancyGuard {
 
     function getUsdValue(address _token, uint256 _amount) public view returns (uint256) {
         AggregatorV3Interface priceFees = AggregatorV3Interface(s_priceFeeds[_token]);
-        (, int256 price,,,) = priceFees.latestRoundData();
+        (, int256 price,,,) = priceFees.staleCheckLatestRoundData();
         // 1ETH = $1000
         // The returned value from CL will be 1000 * 1e8
         return (uint256(price) * ADDITIONAL_FEED_PRECISION * _amount) / PRECISION;

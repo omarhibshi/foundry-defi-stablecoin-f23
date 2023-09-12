@@ -77,3 +77,15 @@ RoadMap to Creating our Stable Coin
     a. We will only allow the following coins to be deposited and therefore used as collateral:
     1. wETH
     2. wBTC
+
+- Calculate health factor function
+- set health factor if debt is 0
+- Added a bunch of view function 
+
+1. what are our invariant/properties?
+
+
+Some more lessons to learn
+1. Some proper oracle use
+2. write more test (for us to do)
+3. Smart Contract Audit preparation
